@@ -42,12 +42,8 @@ func main() {
 	fmt.Printf("Server: %s\n\n", *addr)
 
 	// Connect to BaudLink gRPC server
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, *addr,
+	conn, err := grpc.NewClient(*addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to BaudLink: %v\n   Make sure 'baudlink serve' is running.", err)
