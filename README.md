@@ -253,9 +253,12 @@ BaudLink/
 ├── api/
 │   ├── grpc_server.go     # gRPC implementation
 │   └── proto/
+│       ├── README.md       # Proto documentation (for submodule use)
+│       ├── buf.yaml        # Buf configuration (for submodule use)
 │       ├── serial.proto    # gRPC definitions
 │       ├── serial.pb.go    # Generated protobuf code
-│       └── serial_grpc.pb.go
+│       ├── serial_grpc.pb.go
+│       └── examples/       # Example buf.gen.yaml files for clients
 ├── cmd/
 │   ├── root.go            # Root command
 │   ├── serve.go           # Serve command
@@ -339,6 +342,50 @@ On Linux, you can create a virtual serial port pair:
 ```bash
 socat -d -d pty,raw,echo=0 pty,raw,echo=0
 ```
+
+## Using Proto Definitions in Your Project
+
+The proto definitions can be used as a **git submodule** to share contracts with UI projects, mobile apps, or other services.
+
+### Option 1: Using the Proto Directory Directly
+
+If the proto directory has been extracted to a separate repository (e.g., `BaudLink-protos`):
+
+```bash
+# Add as a git submodule
+git submodule add https://github.com/Shoaibashk/BaudLink-protos.git protos/baudlink
+git submodule update --init --recursive
+```
+
+### Option 2: Using Buf to Generate Client Code
+
+With [Buf](https://buf.build/), you can easily generate client code for various languages:
+
+```bash
+# Install buf
+brew install bufbuild/buf/buf  # macOS
+# See https://docs.buf.build/installation for other platforms
+
+# Generate TypeScript client code
+buf generate protos/baudlink
+```
+
+Example `buf.gen.yaml` for a TypeScript project:
+
+```yaml
+version: v2
+inputs:
+  - directory: protos/baudlink
+plugins:
+  - remote: buf.build/bufbuild/es
+    out: src/gen
+    opt: target=ts
+  - remote: buf.build/connectrpc/es
+    out: src/gen
+    opt: target=ts
+```
+
+See the [Proto README](api/proto/README.md) for complete documentation and examples for other languages (Python, C#, Dart, etc.).
 
 ## Contributing
 

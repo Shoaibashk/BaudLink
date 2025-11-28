@@ -1,0 +1,19 @@
+# buf.gen.yaml for TypeScript/JavaScript UI projects using Connect-RPC
+# Copy this file to your project root and adjust paths as needed
+
+version: v2
+
+# Point to the protos submodule directory
+inputs:
+  - directory: protos/baudlink
+
+plugins:
+  # ECMAScript/TypeScript code generation
+  - remote: buf.build/bufbuild/es
+    out: src/gen
+    opt: target=ts
+
+  # Connect-RPC client generation
+  - remote: buf.build/connectrpc/es
+    out: src/gen
+    opt: target=ts
