@@ -1,0 +1,96 @@
+# BaudLink Agent Configuration
+# ================================
+
+# Server configuration
+server:
+  # gRPC server address
+  grpc_address: "0.0.0.0:50051"
+  
+  # Optional WebSocket server (for web clients)
+  websocket_address: "0.0.0.0:8080"
+  websocket_enabled: false
+  
+  # Maximum concurrent connections
+  max_connections: 100
+  
+  # Connection timeout in seconds
+  connection_timeout: 30
+
+# TLS/SSL configuration (optional, for secure transport)
+tls:
+  enabled: false
+  cert_file: ""
+  key_file: ""
+  ca_file: ""
+
+# Serial port configuration
+serial:
+  # Default port settings
+  defaults:
+    baud_rate: 9600
+    data_bits: 8
+    stop_bits: 1
+    parity: "none"
+    flow_control: "none"
+    read_timeout_ms: 1000
+    write_timeout_ms: 1000
+  
+  # Port scanning interval in seconds (0 to disable)
+  scan_interval: 5
+  
+  # Ports to exclude from scanning (regex patterns)
+  exclude_patterns: []
+  # - "^/dev/ttyS[0-3]$"  # Exclude legacy serial ports on Linux
+  
+  # Allow multiple clients per port (not recommended)
+  allow_shared_access: false
+
+# Logging configuration
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"
+  
+  # Log format: json, text
+  format: "text"
+  
+  # Log file path (empty for stdout only)
+  file: ""
+  
+  # Maximum log file size in MB
+  max_size: 100
+  
+  # Number of log files to retain
+  max_backups: 3
+  
+  # Maximum age in days
+  max_age: 30
+  
+  # Compress rotated files
+  compress: true
+
+# Service configuration (platform-specific)
+service:
+  # Service name for Windows/systemd
+  name: "baudlink"
+  
+  # Display name for Windows services
+  display_name: "BaudLink Serial Agent"
+  
+  # Service description
+  description: "Cross-platform serial port background service"
+  
+  # Auto-start on boot
+  auto_start: true
+  
+  # Restart policy: always, on-failure, never
+  restart_policy: "on-failure"
+  
+  # Restart delay in seconds
+  restart_delay: 5
+
+# Metrics and monitoring
+metrics:
+  enabled: false
+  # Prometheus metrics endpoint
+  address: "0.0.0.0:9090"
+  path: "/metrics"

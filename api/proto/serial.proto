@@ -1,0 +1,282 @@
+// Copyright 2024 BaudLink Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package baudlink.serial.v1;
+
+option go_package = "github.com/Shoaibashk/BaudLink/api/proto;serialpb";
+
+// SerialService provides serial port management and communication operations
+service SerialService {
+    // Port Discovery
+    rpc ListPorts(ListPortsRequest) returns (ListPortsResponse);
+    rpc GetPortInfo(GetPortInfoRequest) returns (PortInfo);
+    
+    // Port Management
+    rpc OpenPort(OpenPortRequest) returns (OpenPortResponse);
+    rpc ClosePort(ClosePortRequest) returns (ClosePortResponse);
+    rpc GetPortStatus(GetPortStatusRequest) returns (PortStatus);
+    
+    // Data Transfer
+    rpc Write(WriteRequest) returns (WriteResponse);
+    rpc Read(ReadRequest) returns (ReadResponse);
+    
+    // Streaming
+    rpc StreamRead(StreamReadRequest) returns (stream DataChunk);
+    rpc StreamWrite(stream DataChunk) returns (StreamWriteResponse);
+    rpc BiDirectionalStream(stream DataChunk) returns (stream DataChunk);
+    
+    // Port Configuration
+    rpc ConfigurePort(ConfigurePortRequest) returns (ConfigurePortResponse);
+    rpc GetPortConfig(GetPortConfigRequest) returns (PortConfig);
+    
+    // Health & Diagnostics
+    rpc Ping(PingRequest) returns (PingResponse);
+    rpc GetAgentInfo(GetAgentInfoRequest) returns (AgentInfo);
+}
+
+// ============================================================================
+// Port Discovery Messages
+// ============================================================================
+
+message ListPortsRequest {
+    // Optional filter to include only available (unopened) ports
+    bool only_available = 1;
+}
+
+message ListPortsResponse {
+    repeated PortInfo ports = 1;
+}
+
+message GetPortInfoRequest {
+    string port_name = 1;
+}
+
+message PortInfo {
+    string name = 1;                    // e.g., "COM3" or "/dev/ttyUSB0"
+    string description = 2;             // Human-readable description
+    string hardware_id = 3;             // USB VID:PID or similar
+    string manufacturer = 4;            // Device manufacturer
+    string product = 5;                 // Product name
+    string serial_number = 6;           // Device serial number
+    PortType port_type = 7;             // Type of port
+    bool is_open = 8;                   // Whether port is currently open
+    string locked_by = 9;               // Client ID if locked
+}
+
+enum PortType {
+    PORT_TYPE_UNSPECIFIED = 0;
+    PORT_TYPE_USB = 1;
+    PORT_TYPE_NATIVE = 2;
+    PORT_TYPE_BLUETOOTH = 3;
+    PORT_TYPE_VIRTUAL = 4;
+}
+
+// ============================================================================
+// Port Management Messages
+// ============================================================================
+
+message OpenPortRequest {
+    string port_name = 1;
+    PortConfig config = 2;
+    string client_id = 3;               // Unique client identifier for locking
+    bool exclusive = 4;                 // Request exclusive access
+}
+
+message OpenPortResponse {
+    bool success = 1;
+    string message = 2;
+    string session_id = 3;              // Session ID for this connection
+}
+
+message ClosePortRequest {
+    string port_name = 1;
+    string session_id = 2;
+}
+
+message ClosePortResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetPortStatusRequest {
+    string port_name = 1;
+}
+
+message PortStatus {
+    string port_name = 1;
+    bool is_open = 2;
+    bool is_locked = 3;
+    string locked_by = 4;
+    string session_id = 5;
+    PortConfig current_config = 6;
+    PortStatistics statistics = 7;
+}
+
+message PortStatistics {
+    uint64 bytes_sent = 1;
+    uint64 bytes_received = 2;
+    uint64 errors = 3;
+    int64 opened_at = 4;                // Unix timestamp
+    int64 last_activity = 5;            // Unix timestamp
+}
+
+// ============================================================================
+// Port Configuration Messages
+// ============================================================================
+
+message PortConfig {
+    uint32 baud_rate = 1;               // e.g., 9600, 115200
+    DataBits data_bits = 2;
+    StopBits stop_bits = 3;
+    Parity parity = 4;
+    FlowControl flow_control = 5;
+    uint32 read_timeout_ms = 6;         // Read timeout in milliseconds
+    uint32 write_timeout_ms = 7;        // Write timeout in milliseconds
+}
+
+enum DataBits {
+    DATA_BITS_UNSPECIFIED = 0;
+    DATA_BITS_5 = 5;
+    DATA_BITS_6 = 6;
+    DATA_BITS_7 = 7;
+    DATA_BITS_8 = 8;
+}
+
+enum StopBits {
+    STOP_BITS_UNSPECIFIED = 0;
+    STOP_BITS_1 = 1;
+    STOP_BITS_1_5 = 2;
+    STOP_BITS_2 = 3;
+}
+
+enum Parity {
+    PARITY_UNSPECIFIED = 0;
+    PARITY_NONE = 1;
+    PARITY_ODD = 2;
+    PARITY_EVEN = 3;
+    PARITY_MARK = 4;
+    PARITY_SPACE = 5;
+}
+
+enum FlowControl {
+    FLOW_CONTROL_UNSPECIFIED = 0;
+    FLOW_CONTROL_NONE = 1;
+    FLOW_CONTROL_HARDWARE = 2;          // RTS/CTS
+    FLOW_CONTROL_SOFTWARE = 3;          // XON/XOFF
+}
+
+message ConfigurePortRequest {
+    string port_name = 1;
+    string session_id = 2;
+    PortConfig config = 3;
+}
+
+message ConfigurePortResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetPortConfigRequest {
+    string port_name = 1;
+}
+
+// ============================================================================
+// Data Transfer Messages
+// ============================================================================
+
+message WriteRequest {
+    string port_name = 1;
+    string session_id = 2;
+    bytes data = 3;
+    bool flush = 4;                     // Flush buffer after write
+}
+
+message WriteResponse {
+    bool success = 1;
+    uint32 bytes_written = 2;
+    string message = 3;
+}
+
+message ReadRequest {
+    string port_name = 1;
+    string session_id = 2;
+    uint32 max_bytes = 3;               // Maximum bytes to read
+    uint32 timeout_ms = 4;              // Timeout for this read operation
+}
+
+message ReadResponse {
+    bool success = 1;
+    bytes data = 2;
+    uint32 bytes_read = 3;
+    string message = 4;
+}
+
+// ============================================================================
+// Streaming Messages
+// ============================================================================
+
+message StreamReadRequest {
+    string port_name = 1;
+    string session_id = 2;
+    uint32 chunk_size = 3;              // Preferred chunk size
+    bool include_timestamps = 4;         // Include timestamps in chunks
+}
+
+message DataChunk {
+    string port_name = 1;
+    bytes data = 2;
+    int64 timestamp = 3;                // Unix timestamp in nanoseconds
+    uint32 sequence = 4;                // Sequence number for ordering
+}
+
+message StreamWriteResponse {
+    bool success = 1;
+    uint64 total_bytes_written = 2;
+    uint32 chunks_processed = 3;
+    string message = 4;
+}
+
+// ============================================================================
+// Health & Diagnostics Messages
+// ============================================================================
+
+message PingRequest {
+    string message = 1;
+}
+
+message PingResponse {
+    string message = 1;
+    int64 server_time = 2;              // Unix timestamp
+}
+
+message GetAgentInfoRequest {}
+
+message AgentInfo {
+    string version = 1;
+    string build_commit = 2;
+    string build_date = 3;
+    string os = 4;
+    string arch = 5;
+    int64 uptime_seconds = 6;
+    repeated string supported_features = 7;
+    AgentConfig config = 8;
+}
+
+message AgentConfig {
+    string grpc_address = 1;
+    bool tls_enabled = 2;
+    uint32 max_connections = 3;
+}

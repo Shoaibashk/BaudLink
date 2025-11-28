@@ -31,9 +31,27 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:     "baudlink",
-	Short:   "BaudLink - A CLI tool for serial communication",
-	Long:    `BaudLink is a command-line interface tool designed for serial communication and related operations.`,
+	Use:   "baudlink",
+	Short: "BaudLink - Cross-platform Serial Port Background Service",
+	Long: `BaudLink is a cross-platform serial port background service agent.
+
+It runs on Windows, Linux, and Raspberry Pi, managing all serial hardware
+and exposing a public gRPC API for any client.
+
+Features:
+  • Auto-detect and enumerate serial ports
+  • Open, close, and configure serial ports
+  • Read and write data with streaming support
+  • Token-based authentication
+  • Port locking (1 client = 1 port)
+  • Run as Windows Service or systemd service
+
+Quick Start:
+  baudlink scan              # List available serial ports
+  baudlink serve             # Start the gRPC server
+  baudlink service install   # Install as system service
+
+For more information, visit: https://github.com/Shoaibashk/BaudLink`,
 	Version: version,
 }
 
