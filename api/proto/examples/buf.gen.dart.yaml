@@ -1,0 +1,13 @@
+# buf.gen.yaml for Dart/Flutter projects
+# Copy this file to your project root and adjust paths as needed
+
+version: v2
+
+# Point to the protos submodule directory
+inputs:
+  - directory: protos/baudlink
+
+plugins:
+  # Dart protobuf code generation
+  - remote: buf.build/protocolbuffers/dart
+    out: lib/src/gen
