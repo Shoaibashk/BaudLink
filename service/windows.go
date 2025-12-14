@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/windows/svc"
@@ -37,9 +38,9 @@ var elog debug.Log
 
 // WindowsService implements the Windows service interface
 type WindowsService struct {
-	config   *config.Config
-	startFn  func() error
-	stopFn   func()
+	config  *config.Config
+	startFn func() error
+	stopFn  func()
 }
 
 // NewWindowsService creates a new Windows service
@@ -189,9 +190,44 @@ func Uninstall(cfg *config.Config) error {
 	}
 	defer s.Close()
 
-	err = s.Delete()
-	if err != nil {
-		return fmt.Errorf("failed to delete service: %w", err)
+	// If the service is running or stopping, request stop and wait.
+	if status, qerr := s.Query(); qerr == nil {
+		if status.State != svc.Stopped {
+			// try to stop the service (best-effort)
+			_, _ = s.Control(svc.Stop)
+
+			timeout := time.Now().Add(30 * time.Second)
+			for {
+				st, qerr := s.Query()
+				if qerr != nil {
+					return fmt.Errorf("failed to query service: %w", qerr)
+				}
+				if st.State == svc.Stopped {
+					break
+				}
+				if time.Now().After(timeout) {
+					return fmt.Errorf("timeout waiting for service to stop before uninstall")
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+	}
+
+	// Attempt delete with a few retries to handle SCM propagation delays.
+	var deleteErr error
+	for i := 0; i < 5; i++ {
+		deleteErr = s.Delete()
+		if deleteErr == nil {
+			break
+		}
+		// If service is already marked for deletion (Windows error 1072), return a clear message.
+		if errno, ok := deleteErr.(syscall.Errno); ok && errno == 1072 {
+			return fmt.Errorf("service %s is marked for deletion: please wait a moment or reboot the machine to clear the state (original error: %w)", cfg.Service.Name, deleteErr)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if deleteErr != nil {
+		return fmt.Errorf("failed to delete service: %w", deleteErr)
 	}
 
 	err = eventlog.Remove(cfg.Service.Name)

@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -150,7 +151,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Register services
 	serialServer := api.NewSerialServer(manager, scanner, cfg)
 	pb.RegisterSerialServiceServer(grpcServer, serialServer)
-	
+
 	// Enable reflection for development/debugging tools like grpcurl
 	reflection.Register(grpcServer)
 
@@ -160,32 +161,60 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	// Handle graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Start server in goroutine
+	// Create server control primitives
 	errChan := make(chan error, 1)
-	go func() {
+
+	startFn := func() error {
 		log.Printf("gRPC server listening on %s", cfg.Server.GRPCAddress)
 		if err := grpcServer.Serve(listener); err != nil {
+			// Serve returns ErrServerStopped on graceful stop; treat as nil
+			errChan <- err
+			return err
+		}
+		return nil
+	}
+
+	stopFn := func() {
+		log.Println("Shutting down server...")
+		grpcServer.GracefulStop()
+		manager.CloseAll()
+		log.Println("Server stopped")
+	}
+
+	// If running on Windows, the platform-specific runner may handle service
+	// integration (svc.Run). If it does, it will run the server (foreground
+	// or as a service) and return its result.
+	if handled, err := runServiceIfWindows(cfg, startFn, stopFn); handled {
+		return err
+	}
+
+	// Interactive/foreground mode: handle signals and run server normally
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	// Start server in goroutine
+	go func() {
+		if err := startFn(); err != nil {
 			errChan <- err
 		}
 	}()
 
-	// Wait for shutdown signal or error
+	// Wait for shutdown signal or server error
 	select {
 	case <-ctx.Done():
 		log.Println("Shutdown signal received")
+		stopFn()
+		// give server a moment to stop
+		select {
+		case err := <-errChan:
+			if err != nil {
+				return fmt.Errorf("server error: %w", err)
+			}
+		case <-time.After(5 * time.Second):
+		}
 	case err := <-errChan:
 		return fmt.Errorf("server error: %w", err)
 	}
-
-	// Graceful shutdown
-	log.Println("Shutting down server...")
-	grpcServer.GracefulStop()
-	manager.CloseAll()
-	log.Println("Server stopped")
 
 	return nil
 }

@@ -22,36 +22,49 @@ GOMOD=$(GOCMD) mod
 # Default target
 all: build
 
+# Platform specific helpers
+ifeq ($(OS),Windows_NT)
+MKDIR_P = powershell -NoProfile -Command New-Item -ItemType Directory -Force -Path
+RM = powershell -NoProfile -Command Remove-Item -Recurse -Force
+else
+MKDIR_P = mkdir -p
+RM = rm -rf
+endif
+
 # Build the binary
 build:
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR_P) $(BUILD_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) .
+ifeq ($(OS),Windows_NT)
+	@echo "Building tray application..."
+	$(GOBUILD) $(LDFLAGS) -ldflags "-H windowsgui" -o $(BUILD_DIR)/baudlink-tray.exe .
+endif
 
 # Build for all platforms
 build-all: build-linux build-windows build-darwin build-arm
 
 build-linux:
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR_P) $(BUILD_DIR)
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_amd64 .
 
 build-windows:
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR_P) $(BUILD_DIR)
 	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_windows_amd64.exe .
 
 build-darwin:
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR_P) $(BUILD_DIR)
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_darwin_amd64 .
 	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_darwin_arm64 .
 
 build-arm:
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR_P) $(BUILD_DIR)
 	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_arm7 .
 	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_arm64 .
 
 # Clean build artifacts
 clean:
 	$(GOCLEAN)
-	rm -rf $(BUILD_DIR)
+	$(RM) $(BUILD_DIR)
 
 # Run tests
 test:
@@ -92,7 +105,7 @@ install: build
 
 # Uninstall the binary
 uninstall:
-	rm -f $(shell $(GOCMD) env GOPATH)/bin/baudlink
+	$(RM) $(shell $(GOCMD) env GOPATH)/bin/baudlink
 
 # Run the server
 run: build
@@ -109,6 +122,22 @@ scan: build
 # Show version
 version: build
 	$(BINARY_NAME) version
+
+# Build and run tray application (Windows only)
+build-tray:
+ifeq ($(OS),Windows_NT)
+	@$(MKDIR_P) $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -ldflags "-H windowsgui" -o $(BUILD_DIR)/baudlink-tray.exe .
+else
+	@echo "Tray application is only available on Windows"
+endif
+
+tray: build-tray
+ifeq ($(OS),Windows_NT)
+	$(BUILD_DIR)/baudlink-tray.exe tray
+else
+	@echo "Tray application is only available on Windows"
+endif
 
 # Install development tools
 dev-tools:
@@ -136,5 +165,7 @@ help:
 	@echo "  run          Build and run the server"
 	@echo "  run-debug    Build and run with debug logging"
 	@echo "  scan         Scan for serial ports"
+	@echo "  build-tray   Build system tray GUI application (Windows only)"
+	@echo "  tray         Build and run system tray application (Windows only)"
 	@echo "  dev-tools    Install development tools"
 	@echo "  help         Show this help"

@@ -9,12 +9,13 @@ before:
     - go generate ./...
 
 builds:
-  - env:
+  # CLI binary (cross-platform)
+  - id: cli
+    main: ./main.go
+    env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - windows
-      - darwin
     goarch:
       - amd64
       - arm64
@@ -25,20 +26,41 @@ builds:
       - -X github.com/Shoaibashk/BaudLink/cmd.date={{.Date}}
     binary: baudlink
 
+  # Windows tray app (GUI - no console window)
+  - id: tray-windows
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -H=windowsgui
+      - -X github.com/Shoaibashk/BaudLink/cmd.version={{.Version}}
+      - -X github.com/Shoaibashk/BaudLink/cmd.commit={{.Commit}}
+      - -X github.com/Shoaibashk/BaudLink/cmd.date={{.Date}}
+    binary: baudlink-tray
+
 archives:
-  - formats:
-      - tar.gz
+  - id: windows
+    ids:
+      - cli
+      - tray-windows
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
+    formats:
+      - zip
+    files:
+      - README.md
+      - LICENSE
+      - INSTALL.md
 
 changelog:
   sort: asc
@@ -51,7 +73,7 @@ changelog:
       - "Merge branch"
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
@@ -63,3 +85,21 @@ release:
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}}-v{{.Version}}"
+  extra_files:
+    - glob: ./dist/*.zip
+
+# Disabled until Linux/Darwin cross-compilation is fixed
+# nfpms:
+#   - id: baudlink
+#     ids:
+#       - cli
+#     package_name: baudlink
+#     vendor: BaudLink Authors
+#     homepage: https://github.com/Shoaibashk/BaudLink
+#     maintainer: Shoaibashk
+#     description: Cross-platform Serial Port Background Service
+#     license: Apache 2.0
+#     formats:
+#       - deb
+#       - rpm
+#     bindir: /usr/bin
