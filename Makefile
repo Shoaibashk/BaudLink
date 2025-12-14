@@ -5,11 +5,14 @@
 
 # Variables
 BUILD_DIR=build
-BINARY_NAME=$(BUILD_DIR)/baudlink
+EXE=
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS=-ldflags "-X github.com/Shoaibashk/BaudLink/cmd.version=$(VERSION) -X github.com/Shoaibashk/BaudLink/cmd.commit=$(COMMIT) -X github.com/Shoaibashk/BaudLink/cmd.date=$(DATE)"
+
+# LDFLAGS for each binary (inject version info into respective packages)
+LDFLAGS_CLI=-ldflags "-X github.com/Shoaibashk/BaudLink/cmd/cli.version=$(VERSION) -X github.com/Shoaibashk/BaudLink/cmd/cli.commit=$(COMMIT) -X github.com/Shoaibashk/BaudLink/cmd/cli.date=$(DATE)"
+LDFLAGS_SERVICE=-ldflags "-X github.com/Shoaibashk/BaudLink/cmd/service.version=$(VERSION) -X github.com/Shoaibashk/BaudLink/cmd/service.commit=$(COMMIT) -X github.com/Shoaibashk/BaudLink/cmd/service.date=$(DATE)"
 
 # Go parameters
 GOCMD=go
@@ -18,12 +21,10 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
-
-# Default target
-all: build
-
 # Platform specific helpers
+
 ifeq ($(OS),Windows_NT)
+EXE=.exe
 MKDIR_P = powershell -NoProfile -Command New-Item -ItemType Directory -Force -Path
 RM = powershell -NoProfile -Command Remove-Item -Recurse -Force
 else
@@ -31,52 +32,62 @@ MKDIR_P = mkdir -p
 RM = rm -rf
 endif
 
-# Build the binary
-build:
-	@$(MKDIR_P) $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) .
-ifeq ($(OS),Windows_NT)
-	@echo "Building tray application..."
-	$(GOBUILD) $(LDFLAGS) -ldflags "-H windowsgui" -o $(BUILD_DIR)/baudlink-tray.exe .
-endif
+# Binary paths (include EXE suffix on Windows)
+SERVICE_BINARY=$(BUILD_DIR)/baudlink-service$(EXE)
+CLI_BINARY=$(BUILD_DIR)/baudlink-cli$(EXE)
+build: build-service build-cli
 
-# Build for all platforms
-build-all: build-linux build-windows build-darwin build-arm
-
-build-linux:
+build-service:
 	@$(MKDIR_P) $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_amd64 .
+	$(GOBUILD) $(LDFLAGS_SERVICE) -o $(SERVICE_BINARY) ./cmd/service
 
-build-windows:
+# Build the Windows GUI variant of the service (use manually on Windows)
+build-service-windows:
 	@$(MKDIR_P) $(BUILD_DIR)
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_windows_amd64.exe .
+	@echo "Building Windows GUI service executable..."
+	$(GOBUILD) $(LDFLAGS_SERVICE) -ldflags "-H windowsgui" -o $(SERVICE_BINARY) ./cmd/service
 
-build-darwin:
+build-cli:
 	@$(MKDIR_P) $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_darwin_amd64 .
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_darwin_arm64 .
+	$(GOBUILD) $(LDFLAGS_CLI) -o $(CLI_BINARY) ./cmd/cli
 
-build-arm:
-	@$(MKDIR_P) $(BUILD_DIR)
-	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_arm7 .
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/baudlink_linux_arm64 .
+# Packaging
+PACKAGE_DIR=$(BUILD_DIR)/packages
+
+package-linux: build-service
+	@$(MKDIR_P) $(PACKAGE_DIR)
+	@echo "Creating Linux package..."
+	bash packaging/linux/package-linux.sh
+	@echo "Linux package created in $(PACKAGE_DIR)"
+
+package-windows: build-service build-cli
+	@$(MKDIR_P) $(PACKAGE_DIR)
+	@echo "Creating Windows installer (requires makensis)"
+	@pwsh -NoProfile -File packaging/windows/package-windows.ps1 -OutDir $(PACKAGE_DIR)
+	@echo "Windows installer created in $(PACKAGE_DIR)"
+
+package: package-linux package-windows
+	@echo "All packages created in $(PACKAGE_DIR)"
+
+install: build-service build-cli
+	# Install both service and cli into GOPATH/bin
+	$(GOCMD) install $(LDFLAGS_SERVICE) ./cmd/service
+	$(GOCMD) install $(LDFLAGS_CLI) ./cmd/cli
+
+run: build-service
+	$(SERVICE_BINARY) serve
+run-debug: build-service
+	$(SERVICE_BINARY) serve --debug
+scan: build-cli
+	$(CLI_BINARY) scan -v
 
 # Clean build artifacts
 clean:
 	$(GOCLEAN)
 	$(RM) $(BUILD_DIR)
 
-# Run tests
-test:
-	$(GOTEST) -v ./...
-
-# Run tests with coverage
-test-coverage:
-	$(GOTEST) -v -coverprofile=coverage.out ./...
-	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-
-# Run linter
-lint:
+# Run tests with vet and optional linter
+vet-lint:
 	$(GOCMD) vet ./...
 	@if command -v golangci-lint > /dev/null; then \
 		golangci-lint run; \
@@ -99,42 +110,33 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Install the binary
-install: build
-	$(GOCMD) install $(LDFLAGS) .
-
-# Uninstall the binary
+# Uninstall binaries (remove from GOPATH/bin)
 uninstall:
-	$(RM) $(shell $(GOCMD) env GOPATH)/bin/baudlink
+	$(RM) $(shell $(GOCMD) env GOPATH)/bin/baudlink-service || true
+	$(RM) $(shell $(GOCMD) env GOPATH)/bin/baudlink-cli || true
 
-# Run the server
-run: build
-	$(BINARY_NAME) serve
+# CLI run helpers (use built binaries)
+service-run: build-service
+	$(SERVICE_BINARY) serve
 
-# Run with debug logging
-run-debug: build
-	$(BINARY_NAME) serve --debug
+service-run-debug: build-service
+	$(SERVICE_BINARY) serve --debug
 
-# Scan for ports
-scan: build
-	$(BINARY_NAME) scan -v
+cli-scan: build-cli
+	$(CLI_BINARY) scan -v
 
-# Show version
-version: build
-	$(BINARY_NAME) version
-
-# Build and run tray application (Windows only)
-build-tray:
+# Build tray (Windows GUI service)
+build-tray: build-service
 ifeq ($(OS),Windows_NT)
-	@$(MKDIR_P) $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -ldflags "-H windowsgui" -o $(BUILD_DIR)/baudlink-tray.exe .
+	@echo "Windows tray is part of the service binary (built with -H windowsgui)"
+	@echo "To build the GUI service executable run: make build-service on Windows"
 else
-	@echo "Tray application is only available on Windows"
+	@echo "Tray application (GUI) is only available on Windows"
 endif
 
-tray: build-tray
+tray: build-service
 ifeq ($(OS),Windows_NT)
-	$(BUILD_DIR)/baudlink-tray.exe tray
+	$(SERVICE_BINARY) tray
 else
 	@echo "Tray application is only available on Windows"
 endif
@@ -169,3 +171,5 @@ help:
 	@echo "  tray         Build and run system tray application (Windows only)"
 	@echo "  dev-tools    Install development tools"
 	@echo "  help         Show this help"
+	@echo "  package-linux Create a Linux tarball (systemd unit + installer)"
+	@echo "  package-windows Create a Windows NSIS installer (requires makensis)"

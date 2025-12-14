@@ -38,6 +38,15 @@ BaudLink is a **cross-platform serial port background service** that runs on Win
 
 **No UI. No frontend. Just a rock-solid hardware agent.** 💪
 
+## Client–Server Architecture
+
+BaudLink is intentionally split into two complementary binaries:
+
+- `baudlink-service` — background system service (Windows Service / systemd) that manages hardware and serves a gRPC API.
+- `baudlink-cli` — user-facing CLI that connects to the service over local gRPC and exposes commands for scanning ports, opening sessions, reading/writing, and service management.
+
+This split allows multiple clients to connect to a single privileged agent while keeping UI and tooling unprivileged and easily scriptable.
+
 ## Features
 
 ### 🔌 Serial Port Management
@@ -106,6 +115,20 @@ go install .
 ```bash
 go install github.com/Shoaibashk/BaudLink@latest
 ```
+
+### Packaging (for distribution)
+
+You can build platform installers from source with the Makefile packaging targets:
+
+```bash
+# Linux: creates a tar.gz with the service binary, systemd unit, and installer script
+make package-linux
+
+# Windows: creates an NSIS installer (requires makensis)
+make package-windows
+```
+
+The Linux package contains an `install.sh` that copies the binary to `/usr/local/bin` and installs the systemd unit. The Windows installer will place binaries under `C:\Program Files\BaudLink` and register a Windows service named `BaudLink`.
 
 ## Quick Start
 

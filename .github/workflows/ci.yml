@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+      - name: Build binaries
+        run: make build
+      - name: Install dependencies (jq)
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run smoke test (bash)
+        run: bash ./scripts/smoke-test.sh 50055
+        - name: Create Linux packages
+          run: make package-linux
+        - name: Upload Linux package artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: linux-package
+            path: build/packages/*.tar.gz
+      - name: Run unit & integration tests
+        run: go test ./... -v
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+      - name: Build binaries
+        run: make build
+        - name: Run smoke test (PowerShell)
+          run: pwsh -NoProfile -File .\scripts\smoke-test.ps1 -Port 50055
+        - name: Install NSIS (Chocolatey)
+          run: choco install -y nsis || true
+        - name: Create Windows installer (optional)
+          continue-on-error: true
+          run: make package-windows
+        - name: Upload Windows installer (if created)
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: windows-installer
+            path: build/packages/*.exe || true

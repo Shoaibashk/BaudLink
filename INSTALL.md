@@ -152,3 +152,51 @@ make build
 # Test service commands (requires admin)
 .\build\baudlink.exe service start
 ```
+
+## Packaging / Installer
+
+You can create platform installers for distribution using the provided packaging scripts and Makefile targets.
+
+### Linux (systemd tarball)
+
+```bash
+# Build and create a tar.gz package containing the service binary, systemd unit, and installer
+make package-linux
+
+# Extract and install (as root)
+tar xzf build/packages/baudlink_linux_$(uname -m).tar.gz -C /tmp
+cd /tmp/baudlink_linux_$(uname -m)
+sudo ./install.sh
+```
+
+This will install `/usr/local/bin/baudlink-service` and `/etc/systemd/system/baudlink.service`, then enable and start the unit.
+
+### Windows (NSIS installer)
+
+Requirements: NSIS (makensis) must be installed and available on PATH.
+
+```powershell
+# Build and create a Windows installer (requires makensis)
+make package-windows
+
+# Run the generated installer (build/packages/baudlink-installer.exe)
+./build/packages/baudlink-installer.exe
+```
+
+The installer will place `baudlink-service.exe` and `baudlink-cli.exe` under `C:\Program Files\BaudLink` and register a Windows service named `BaudLink`.
+
+## Smoke tests & CI ✅
+
+- PowerShell smoke test (Windows): `scripts/smoke-test.ps1` — starts a local `baudlink-service`, runs a few CLI commands, and stops the service. Example:
+
+```powershell
+pwsh -NoProfile -File .\scripts\smoke-test.ps1 -Port 50055
+```
+
+- Cross-platform Bash smoke test (Linux/macOS): `scripts/smoke-test.sh` (requires `jq`):
+
+```bash
+bash ./scripts/smoke-test.sh 50055
+```
+
+- CI: GitHub Actions workflow is configured in `.github/workflows/ci.yml` to build both binaries, run the smoke tests on Ubuntu and Windows runners, and execute `go test ./...`.

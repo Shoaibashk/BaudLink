@@ -1,0 +1,12 @@
+[Unit]
+Description=BaudLink Serial Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/baudlink-service serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+2025-12-14T10:56:39.8923305+05:30 	 This verification script should be run as Administrator. Re-run as Administrator or use -AutoElevate to prompt for elevation.
+2025-12-14T10:56:39.9317230+05:30 	 DryRun mode: continuing without Admin rights
+2025-12-14T10:56:39.9481505+05:30 	 Starting Windows install & tray verification for service 'BaudLink'
+2025-12-14T10:56:39.9624069+05:30 	 DryRun enabled: no changes will be made
+2025-12-14T10:56:40.0029640+05:30 	 Stopping existing service...
+2025-12-14T10:56:40.0181425+05:30 	 DryRun: would stop and delete existing service
+2025-12-14T10:56:40.0340586+05:30 	 Creating service BaudLink -> C:\Projects\BaudLink\build\baudlink-service.exe
+2025-12-14T10:56:40.0478001+05:30 	 DryRun: would run sc create for C:\Projects\BaudLink\build\baudlink-service.exe
+2025-12-14T10:56:40.0636466+05:30 	 Starting service BaudLink
+2025-12-14T10:56:40.0791454+05:30 	 DryRun: would start service
+2025-12-14T10:56:40.1132974+05:30 	 Service is running. Starting tray application (as current user)
+2025-12-14T10:56:40.1297187+05:30 	 DryRun: would start tray process: C:\Projects\BaudLink\build\baudlink-service.exe tray
+2025-12-14T10:56:41.1595710+05:30 	 Tray process did not start or could not be detected
+2025-12-14T10:56:41.1769409+05:30 	 DryRun: continuing despite missing tray
+2025-12-14T10:56:41.1947563+05:30 	 Tray process started (PID: )
+2025-12-14T10:56:41.2134834+05:30 	 Testing service control via PowerShell
+2025-12-14T10:56:41.2292677+05:30 	 DryRun: skipping start/stop checks
+2025-12-14T10:56:41.2466362+05:30 	 Service control verified. Cleaning up: stopping tray and uninstalling service
+2025-12-14T10:56:41.2641205+05:30 	 DryRun: skipping cleanup
+2025-12-14T10:56:41.2826216+05:30 	 Windows install & tray verification completed successfully
