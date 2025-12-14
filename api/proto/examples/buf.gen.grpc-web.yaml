@@ -1,0 +1,18 @@
+# buf.gen.yaml for gRPC-Web projects (for browser-based UIs)
+# Copy this file to your project root and adjust paths as needed
+
+version: v2
+
+# Point to the protos submodule directory
+inputs:
+  - directory: protos/baudlink
+
+plugins:
+  # JavaScript code generation
+  - remote: buf.build/protocolbuffers/js
+    out: src/gen
+
+  # gRPC-Web code generation
+  - remote: buf.build/grpc/web
+    out: src/gen
+    opt: import_style=typescript,mode=grpcwebtext

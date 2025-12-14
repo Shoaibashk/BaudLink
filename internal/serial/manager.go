@@ -203,7 +203,10 @@ func (m *Manager) OpenPort(portName string, config PortConfig, clientID string, 
 
 	// Set read timeout
 	if config.ReadTimeoutMs > 0 {
-		port.SetReadTimeout(time.Duration(config.ReadTimeoutMs) * time.Millisecond)
+		if err := port.SetReadTimeout(time.Duration(config.ReadTimeoutMs) * time.Millisecond); err != nil {
+			port.Close()
+			return nil, fmt.Errorf("failed to set read timeout: %w", err)
+		}
 	}
 
 	// Create session
@@ -364,7 +367,9 @@ func (m *Manager) Configure(portName string, sessionID string, config PortConfig
 	}
 
 	if config.ReadTimeoutMs > 0 {
-		session.port.SetReadTimeout(time.Duration(config.ReadTimeoutMs) * time.Millisecond)
+		if err := session.port.SetReadTimeout(time.Duration(config.ReadTimeoutMs) * time.Millisecond); err != nil {
+			return fmt.Errorf("failed to set read timeout: %w", err)
+		}
 	}
 
 	session.Config = config
@@ -402,7 +407,7 @@ func (m *Manager) CloseAll() {
 	defer m.mu.Unlock()
 
 	for _, session := range m.sessions {
-		m.closeSessionLocked(session)
+		_ = m.closeSessionLocked(session) // Best-effort close, ignore errors during cleanup
 	}
 }
 

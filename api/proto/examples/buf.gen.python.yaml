@@ -1,0 +1,17 @@
+# buf.gen.yaml for Python projects
+# Copy this file to your project root and adjust paths as needed
+
+version: v2
+
+# Point to the protos submodule directory
+inputs:
+  - directory: protos/baudlink
+
+plugins:
+  # Python protobuf code generation
+  - remote: buf.build/protocolbuffers/python
+    out: src/gen
+
+  # Python gRPC code generation
+  - remote: buf.build/grpc/python
+    out: src/gen
